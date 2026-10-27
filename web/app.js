@@ -133,6 +133,15 @@ async function stopAll() {
   setStatus('Stopped');
 }
 
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
 function toggleRecord() {
   const btn = $('btnRec'), info = $('recInfo');
   if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
@@ -143,13 +152,25 @@ function toggleRecord() {
   const chunks = [];
   recorder = new MediaRecorder(recDest.stream, mime ? { mimeType: mime } : undefined);
   recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-  recorder.onstop = () => {
+  recorder.onstop = async () => {
     const type = recorder.mimeType || 'audio/webm';
     const ext = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm';
-    const url = URL.createObjectURL(new Blob(chunks, { type }));
+    const name = `audiofx-${Date.now()}.${ext}`;
+    const blob = new Blob(chunks, { type });
     btn.textContent = 'Record output';
     btn.classList.remove('on');
-    info.replaceChildren(h('a', { href: url, download: `audiofx-${Date.now()}.${ext}` }, 'Download recording'));
+    if (window.AudioFXNative) {
+      // Inside the Android app a WebView cannot download blob: links, so the
+      // app saves the file for us.
+      try {
+        const where = window.AudioFXNative.saveFile(name, type.split(';')[0], await blobToBase64(blob));
+        info.textContent = where ? `Saved to ${where}` : 'Could not save the recording.';
+      } catch {
+        info.textContent = 'Could not save the recording.';
+      }
+      return;
+    }
+    info.replaceChildren(h('a', { href: URL.createObjectURL(blob), download: name }, 'Download recording'));
   };
   recorder.start();
   btn.textContent = 'Stop recording';

@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+// CI sets GITHUB_RUN_NUMBER, so every build gets a higher version code and
+// installs over the previous one.
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'app.audiofx'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'app.audiofx'
+        minSdk 24
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    signingConfigs {
+        // A personal sideload key kept in the repo so updates install over
+        // older builds. Replace it if you ever publish to an app store.
+        release {
+            storeFile file('../audiofx.keystore')
+            storeType 'pkcs12'
+            storePassword 'audiofx'
+            keyAlias 'audiofx'
+            keyPassword 'audiofx'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    sourceSets {
+        main {
+            // The web app lives in /web at the repo root and is bundled as-is.
+            assets.srcDirs = ['src/main/assets', '../../web']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

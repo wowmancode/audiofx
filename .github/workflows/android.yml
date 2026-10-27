@@ -1,0 +1,83 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Render every effect offline and check the output
+        run: npm test
+
+  apk:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Build signed release APK
+        run: |
+          set +e
+          gradle -p android assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Surface the useful part of the Gradle log as run annotations.
+            grep -E "error:|What went wrong|FAILED|Could not|Execution failed|Caused by|^> " build.log | head -30 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
+          exit "$status"
+
+      - name: Check the APK
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$APK" | head -4
+          "$BT/aapt" dump badging "$APK" | grep -E "^package:|sdkVersion|uses-permission"
+          for f in index.html app.js worklet.js dsp/vocoder.js dsp/core.js; do
+            unzip -l "$APK" | grep -q "assets/$f" || { echo "::error::assets/$f is missing from the APK"; exit 1; }
+          done
+          cp "$APK" AudioFX.apk
+          ls -l AudioFX.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AudioFX-apk
+          path: AudioFX.apk
+
+      - name: Publish a release with the APK
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" AudioFX.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "AudioFX build ${{ github.run_number }}" \
+            --notes "Download AudioFX.apk on your Android phone and open it. Android will ask you to allow installs from your browser the first time." \
+            --latest

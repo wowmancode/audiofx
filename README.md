@@ -1,17 +1,20 @@
 # AudioFX
 
-A real-time audio effects app that runs entirely in the browser, including on Android. It has 37 effects you stack into your own chain, live microphone or audio-file input, and a vocoder with an on-screen keyboard. GitHub Actions tests it and publishes it to GitHub Pages.
+An Android app for real-time audio effects. It has 37 effects you stack into your own chain, live microphone or audio-file input, output recording, and a vocoder with an on-screen keyboard. GitHub Actions builds the APK for you.
 
 There are no character presets. Every effect is a plain building block with its own controls, and the chain starts empty.
 
-## Use it
+## Get the APK
 
-1. Push to `main`. The workflow in `.github/workflows/pages.yml` tests and deploys.
-2. One-time setup: **Settings > Pages > Build and deployment > Source: GitHub Actions**.
-3. Open `https://wowmancode.github.io/audiofx/` (on Android, in Chrome).
-4. Tap **Use microphone** (or **Play audio file**), then **Add effect** and build your chain.
+1. Push to `main` (or run the **Build APK** workflow by hand from the Actions tab).
+2. When it finishes, open the repo's **Releases** page. The newest release has `AudioFX.apk`.
+3. On your phone, download it and open it. Android asks once to allow installs from your browser.
 
-Use wired headphones with the microphone, otherwise the speaker feeds back into the mic. Your chain and settings are remembered on the device.
+The latest build is always at `https://github.com/wowmancode/audiofx/releases/latest/download/AudioFX.apk`. The same file is also attached to each workflow run as the `AudioFX-apk` artifact.
+
+Each build has a higher version number and the same signing key, so a new APK installs over the old one without uninstalling. The signing key is a personal sideload key kept in `android/audiofx.keystore`; replace it if you ever publish to an app store.
+
+The app works fully offline and asks only for the microphone permission. Use wired headphones with the microphone, otherwise the speaker feeds back into the mic. Your chain and settings are remembered on the device, and recordings are saved to `Downloads/AudioFX`.
 
 ## Effects
 
@@ -35,6 +38,7 @@ A filter-bank vocoder: your voice (the modulator) shapes a built-in synth (the c
 ## How it works
 
 ```
+android/                          small WebView app that bundles web/ into an APK
 web/
   index.html, style.css, app.js   UI, input handling, recording, saved state
   worklet.js                      AudioWorklet that runs the chain on the audio thread
@@ -52,15 +56,15 @@ Because the DSP is plain JavaScript, the same code runs in the browser's audio t
 
 ```
 npm test        # offline checks, needs Node 18+
-npm start       # serves web/ locally
+npm start       # serves web/ in a desktop browser for quick UI work
 ```
 
-Microphone access needs HTTPS or `localhost`.
+The Android app serves `web/` from inside the APK over a virtual https origin, which gives the page the secure context the microphone and AudioWorklet need. To build the APK locally you need JDK 17, the Android SDK and Gradle 8.9: `gradle -p android assembleRelease`.
 
-`npm test` renders all 37 effects at 44.1 and 48 kHz and checks that output is finite, audible and bounded; fuzzes 25 random and extreme parameter sets per effect while changing them mid-stream; verifies every effect uses well under a quarter of real time; and runs a series chain of everything.
+`npm test` renders all 37 effects at 44.1 and 48 kHz and checks that output is finite, audible and bounded; fuzzes 25 random and extreme parameter sets per effect while changing them mid-stream; verifies every effect uses well under a quarter of real time; and runs a series chain of everything. CI runs these before building the APK, then checks the APK is signed and contains the web files.
 
 ## Notes
 
-- Latency depends on the device. Android Chrome typically gives roughly 20 to 100 ms with wired headphones.
+- Latency depends on the device. Expect roughly 20 to 100 ms with wired headphones. The app runs in Android System WebView, so keep that updated.
 - Distortion effects are not oversampled, so very high drive can alias.
-- Recording saves WebM/Opus (or whatever the browser supports) from the processed output.
+- Recording saves WebM/Opus (or whatever the WebView supports) from the processed output.
