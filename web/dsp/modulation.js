@@ -5,9 +5,9 @@ class Tremolo extends FX {
   static group = 'Modulation';
   static desc = 'Wobbles the volume. Shape morphs from smooth to chopped.';
   static params = [
-    { key: 'rate', label: 'Rate', min: 0.1, max: 20, step: 0.01, def: 5, unit: ' Hz', log: true },
-    { key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01, def: 0.6 },
-    { key: 'shape', label: 'Shape (smooth to square)', min: 0, max: 1, step: 0.01, def: 0 },
+    { key: 'rate', label: 'Rate', min: 0.1, max: 20, step: 0.01, def: 6, unit: ' Hz', log: true },
+    { key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01, def: 0.9 },
+    { key: 'shape', label: 'Shape (smooth to square)', min: 0, max: 1, step: 0.01, def: 0.35 },
     { key: 'stereo', label: 'Stereo offset', min: 0, max: 1, step: 0.01, def: 0 },
   ];
   init() { this.ph = 0; this.update(); }
@@ -34,11 +34,11 @@ class Chorus extends FX {
   static group = 'Modulation';
   static desc = 'Three slowly modulated delay taps per side for thickening.';
   static params = [
-    { key: 'rate', label: 'Rate', min: 0.05, max: 5, step: 0.01, def: 0.8, unit: ' Hz', log: true },
-    { key: 'depth', label: 'Depth', min: 0, max: 10, step: 0.1, def: 3, unit: ' ms' },
-    { key: 'delay', label: 'Base delay', min: 5, max: 40, step: 0.5, def: 18, unit: ' ms' },
-    { key: 'spread', label: 'Stereo spread', min: 0, max: 1, step: 0.01, def: 0.5 },
-    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.5 },
+    { key: 'rate', label: 'Rate', min: 0.05, max: 5, step: 0.01, def: 0.6, unit: ' Hz', log: true },
+    { key: 'depth', label: 'Depth', min: 0, max: 10, step: 0.1, def: 6, unit: ' ms' },
+    { key: 'delay', label: 'Base delay', min: 5, max: 40, step: 0.5, def: 22, unit: ' ms' },
+    { key: 'spread', label: 'Stereo spread', min: 0, max: 1, step: 0.01, def: 0.8 },
+    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.6 },
   ];
   init() {
     this.dl = new DelayLine(this.sr * 0.07); this.dr = new DelayLine(this.sr * 0.07);
@@ -69,10 +69,10 @@ class Flanger extends FX {
   static group = 'Modulation';
   static desc = 'Short swept delay with feedback for jet-like comb sweeps.';
   static params = [
-    { key: 'rate', label: 'Rate', min: 0.02, max: 5, step: 0.01, def: 0.3, unit: ' Hz', log: true },
-    { key: 'depth', label: 'Depth', min: 0, max: 5, step: 0.05, def: 2, unit: ' ms' },
-    { key: 'delay', label: 'Base delay', min: 0.2, max: 10, step: 0.05, def: 2.5, unit: ' ms' },
-    { key: 'feedback', label: 'Feedback', min: -0.95, max: 0.95, step: 0.01, def: 0.5 },
+    { key: 'rate', label: 'Rate', min: 0.02, max: 5, step: 0.01, def: 0.25, unit: ' Hz', log: true },
+    { key: 'depth', label: 'Depth', min: 0, max: 5, step: 0.05, def: 3.5, unit: ' ms' },
+    { key: 'delay', label: 'Base delay', min: 0.2, max: 10, step: 0.05, def: 1, unit: ' ms' },
+    { key: 'feedback', label: 'Feedback', min: -0.95, max: 0.95, step: 0.01, def: 0.7 },
     { key: 'spread', label: 'Stereo spread', min: 0, max: 1, step: 0.01, def: 0.5 },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.5 },
   ];
@@ -103,12 +103,12 @@ class Phaser extends FX {
   static group = 'Modulation';
   static desc = 'A chain of all-pass filters swept to create moving notches.';
   static params = [
-    { key: 'rate', label: 'Rate', min: 0.02, max: 8, step: 0.01, def: 0.4, unit: ' Hz', log: true },
-    { key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01, def: 0.8 },
-    { key: 'center', label: 'Center frequency', min: 100, max: 4000, step: 1, def: 800, unit: ' Hz', log: true },
-    { key: 'stages', label: 'Stages', min: 2, max: 12, step: 2, def: 4, int: true },
-    { key: 'feedback', label: 'Feedback', min: 0, max: 0.95, step: 0.01, def: 0.3 },
-    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.5 },
+    { key: 'rate', label: 'Rate', min: 0.02, max: 8, step: 0.01, def: 0.5, unit: ' Hz', log: true },
+    { key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01, def: 1 },
+    { key: 'center', label: 'Center frequency', min: 100, max: 4000, step: 1, def: 700, unit: ' Hz', log: true },
+    { key: 'stages', label: 'Stages', min: 2, max: 12, step: 2, def: 6, int: true },
+    { key: 'feedback', label: 'Feedback', min: 0, max: 0.95, step: 0.01, def: 0.65 },
+    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
   ];
   init() {
     this.zl = new Float64Array(12); this.zr = new Float64Array(12);
@@ -146,8 +146,8 @@ class Vibrato extends FX {
   static group = 'Modulation';
   static desc = 'Pitch wobble from a modulated delay.';
   static params = [
-    { key: 'rate', label: 'Rate', min: 0.1, max: 14, step: 0.01, def: 5, unit: ' Hz', log: true },
-    { key: 'depth', label: 'Depth', min: 0, max: 5, step: 0.05, def: 0.8, unit: ' ms' },
+    { key: 'rate', label: 'Rate', min: 0.1, max: 14, step: 0.01, def: 5.5, unit: ' Hz', log: true },
+    { key: 'depth', label: 'Depth', min: 0, max: 5, step: 0.05, def: 2.2, unit: ' ms' },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
   ];
   init() {
@@ -175,11 +175,11 @@ class TapeWobble extends FX {
   static group = 'Modulation';
   static desc = 'Slow wow and fast flutter with a random drift, like an unstable tape transport.';
   static params = [
-    { key: 'wow', label: 'Wow depth', min: 0, max: 6, step: 0.05, def: 1.5, unit: ' ms' },
-    { key: 'wowRate', label: 'Wow rate', min: 0.1, max: 2, step: 0.01, def: 0.6, unit: ' Hz', log: true },
-    { key: 'flutter', label: 'Flutter depth', min: 0, max: 1, step: 0.01, def: 0.25, unit: ' ms' },
+    { key: 'wow', label: 'Wow depth', min: 0, max: 6, step: 0.05, def: 3, unit: ' ms' },
+    { key: 'wowRate', label: 'Wow rate', min: 0.1, max: 2, step: 0.01, def: 0.5, unit: ' Hz', log: true },
+    { key: 'flutter', label: 'Flutter depth', min: 0, max: 1, step: 0.01, def: 0.5, unit: ' ms' },
     { key: 'flutterRate', label: 'Flutter rate', min: 3, max: 20, step: 0.1, def: 9, unit: ' Hz', log: true },
-    { key: 'random', label: 'Randomness', min: 0, max: 1, step: 0.01, def: 0.5 },
+    { key: 'random', label: 'Randomness', min: 0, max: 1, step: 0.01, def: 0.6 },
   ];
   init() {
     this.dl = new DelayLine(this.sr * 0.03); this.dr = new DelayLine(this.sr * 0.03);

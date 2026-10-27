@@ -5,7 +5,7 @@ class Gain extends FX {
   static group = 'Dynamics';
   static desc = 'Simple volume control with click-free smoothing.';
   static params = [
-    { key: 'gain', label: 'Gain', min: -60, max: 24, step: 0.1, def: 0, unit: ' dB' },
+    { key: 'gain', label: 'Gain', min: -60, max: 24, step: 0.1, def: 6, unit: ' dB' },
   ];
   init() { this.cur = dbToLin(this.p.gain); this.update(); }
   update() { this.tgt = dbToLin(this.p.gain); }
@@ -23,12 +23,12 @@ class Compressor extends FX {
   static group = 'Dynamics';
   static desc = 'Evens out loud and quiet parts. Stereo-linked, soft knee.';
   static params = [
-    { key: 'threshold', label: 'Threshold', min: -60, max: 0, step: 0.5, def: -24, unit: ' dB' },
-    { key: 'ratio', label: 'Ratio', min: 1, max: 20, step: 0.1, def: 4, unit: ':1' },
+    { key: 'threshold', label: 'Threshold', min: -60, max: 0, step: 0.5, def: -32, unit: ' dB' },
+    { key: 'ratio', label: 'Ratio', min: 1, max: 20, step: 0.1, def: 8, unit: ':1' },
     { key: 'knee', label: 'Knee', min: 0, max: 24, step: 0.5, def: 6, unit: ' dB' },
-    { key: 'attack', label: 'Attack', min: 0.1, max: 100, step: 0.1, def: 8, unit: ' ms', log: true },
-    { key: 'release', label: 'Release', min: 10, max: 1000, step: 1, def: 150, unit: ' ms', log: true },
-    { key: 'makeup', label: 'Makeup gain', min: 0, max: 30, step: 0.5, def: 3, unit: ' dB' },
+    { key: 'attack', label: 'Attack', min: 0.1, max: 100, step: 0.1, def: 5, unit: ' ms', log: true },
+    { key: 'release', label: 'Release', min: 10, max: 1000, step: 1, def: 120, unit: ' ms', log: true },
+    { key: 'makeup', label: 'Makeup gain', min: 0, max: 30, step: 0.5, def: 10, unit: ' dB' },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
   ];
   init() { this.env = 0; this.update(); }
@@ -64,22 +64,28 @@ register('compressor', Compressor);
 class Limiter extends FX {
   static label = 'Limiter';
   static group = 'Dynamics';
-  static desc = 'Brick-wall ceiling so nothing goes over the level you set.';
+  static desc = 'Pushes the signal into a hard ceiling for loud, dense, evened-out sound.';
   static params = [
-    { key: 'ceiling', label: 'Ceiling', min: -24, max: 0, step: 0.1, def: -1, unit: ' dB' },
-    { key: 'release', label: 'Release', min: 5, max: 500, step: 1, def: 80, unit: ' ms', log: true },
+    { key: 'drive', label: 'Drive into limiter', min: 0, max: 30, step: 0.5, def: 12, unit: ' dB' },
+    { key: 'ceiling', label: 'Ceiling', min: -24, max: 0, step: 0.1, def: -3, unit: ' dB' },
+    { key: 'release', label: 'Release', min: 5, max: 500, step: 1, def: 60, unit: ' ms', log: true },
   ];
   init() { this.g = 1; this.update(); }
-  update() { this.ceil = dbToLin(this.p.ceiling); this.rc = coef(this.p.release, this.sr); }
+  update() {
+    this.ceil = dbToLin(this.p.ceiling);
+    this.drv = dbToLin(this.p.drive);
+    this.rc = coef(this.p.release, this.sr);
+  }
   process(L, R, n) {
-    const ceil = this.ceil;
+    const ceil = this.ceil, drv = this.drv;
     let g = this.g;
     for (let i = 0; i < n; i++) {
-      const pk = Math.max(Math.abs(L[i]), Math.abs(R[i]));
+      const l = L[i] * drv, r = R[i] * drv;
+      const pk = Math.max(Math.abs(l), Math.abs(r));
       const target = pk > ceil ? ceil / pk : 1;
       g = target < g ? target : target + this.rc * (g - target);
-      L[i] = clamp(L[i] * g, -ceil, ceil);
-      R[i] = clamp(R[i] * g, -ceil, ceil);
+      L[i] = clamp(l * g, -ceil, ceil);
+      R[i] = clamp(r * g, -ceil, ceil);
     }
     this.g = g;
   }
@@ -91,10 +97,10 @@ class Gate extends FX {
   static group = 'Dynamics';
   static desc = 'Silences the signal when it falls below the threshold.';
   static params = [
-    { key: 'threshold', label: 'Threshold', min: -90, max: 0, step: 0.5, def: -50, unit: ' dB' },
-    { key: 'attack', label: 'Attack', min: 0.1, max: 50, step: 0.1, def: 2, unit: ' ms', log: true },
-    { key: 'release', label: 'Release', min: 5, max: 1000, step: 1, def: 120, unit: ' ms', log: true },
-    { key: 'range', label: 'Range', min: -80, max: 0, step: 1, def: -60, unit: ' dB' },
+    { key: 'threshold', label: 'Threshold', min: -90, max: 0, step: 0.5, def: -24, unit: ' dB' },
+    { key: 'attack', label: 'Attack', min: 0.1, max: 50, step: 0.1, def: 1, unit: ' ms', log: true },
+    { key: 'release', label: 'Release', min: 5, max: 1000, step: 1, def: 60, unit: ' ms', log: true },
+    { key: 'range', label: 'Range', min: -80, max: 0, step: 1, def: -70, unit: ' dB' },
   ];
   init() { this.env = 0; this.g = 0; this.open = false; this.update(); }
   update() {
@@ -127,10 +133,10 @@ class Saturation extends FX {
   static group = 'Distortion';
   static desc = 'Smooth tanh drive from warm to heavy, with a tone filter after it.';
   static params = [
-    { key: 'drive', label: 'Drive', min: 0, max: 40, step: 0.5, def: 14, unit: ' dB' },
-    { key: 'tone', label: 'Tone (low-pass)', min: 500, max: 20000, step: 10, def: 9000, unit: ' Hz', log: true },
+    { key: 'drive', label: 'Drive', min: 0, max: 40, step: 0.5, def: 18, unit: ' dB' },
+    { key: 'tone', label: 'Tone (low-pass)', min: 500, max: 20000, step: 10, def: 5000, unit: ' Hz', log: true },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
-    { key: 'output', label: 'Output', min: -30, max: 12, step: 0.5, def: -6, unit: ' dB' },
+    { key: 'output', label: 'Output', min: -30, max: 12, step: 0.5, def: -9, unit: ' dB' },
   ];
   init() { this.lpL = 0; this.lpR = 0; this.update(); }
   update() {
@@ -158,10 +164,10 @@ class HardClip extends FX {
   static group = 'Distortion';
   static desc = 'Chops the waveform flat at a threshold for a harsh, buzzy distortion.';
   static params = [
-    { key: 'drive', label: 'Drive', min: 0, max: 40, step: 0.5, def: 12, unit: ' dB' },
-    { key: 'threshold', label: 'Clip level', min: 0.05, max: 1, step: 0.01, def: 0.4 },
+    { key: 'drive', label: 'Drive', min: 0, max: 40, step: 0.5, def: 26, unit: ' dB' },
+    { key: 'threshold', label: 'Clip level', min: 0.05, max: 1, step: 0.01, def: 0.3 },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
-    { key: 'output', label: 'Output', min: -24, max: 12, step: 0.5, def: 0, unit: ' dB' },
+    { key: 'output', label: 'Output', min: -24, max: 12, step: 0.5, def: -4, unit: ' dB' },
   ];
   update() { this.dg = dbToLin(this.p.drive); this.out = dbToLin(this.p.output); }
   process(L, R, n) {
@@ -180,10 +186,10 @@ class Wavefolder extends FX {
   static group = 'Distortion';
   static desc = 'Folds the waveform back on itself, adding metallic harmonics.';
   static params = [
-    { key: 'fold', label: 'Fold', min: 1, max: 20, step: 0.1, def: 3 },
-    { key: 'offset', label: 'Asymmetry', min: -0.5, max: 0.5, step: 0.01, def: 0.1 },
+    { key: 'fold', label: 'Fold', min: 1, max: 20, step: 0.1, def: 5 },
+    { key: 'offset', label: 'Asymmetry', min: -0.5, max: 0.5, step: 0.01, def: 0.15 },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
-    { key: 'output', label: 'Output', min: -30, max: 6, step: 0.5, def: -6, unit: ' dB' },
+    { key: 'output', label: 'Output', min: -30, max: 6, step: 0.5, def: -8, unit: ' dB' },
   ];
   init() { this.xl = 0; this.yl = 0; this.xr = 0; this.yr = 0; this.update(); }
   update() { this.out = dbToLin(this.p.output); }
@@ -211,8 +217,8 @@ class Bitcrusher extends FX {
   static group = 'Distortion';
   static desc = 'Lowers bit depth and sample rate for a crunchy digital grit.';
   static params = [
-    { key: 'bits', label: 'Bit depth', min: 1, max: 16, step: 1, def: 8, unit: ' bit', int: true },
-    { key: 'down', label: 'Sample-rate divide', min: 1, max: 64, step: 0.5, def: 4, unit: 'x' },
+    { key: 'bits', label: 'Bit depth', min: 1, max: 16, step: 1, def: 5, unit: ' bit', int: true },
+    { key: 'down', label: 'Sample-rate divide', min: 1, max: 64, step: 0.5, def: 10, unit: 'x' },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
   ];
   init() { this.c = 0; this.hl = 0; this.hr = 0; this.update(); }

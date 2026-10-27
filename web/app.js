@@ -1,8 +1,9 @@
 import { effectMeta } from './dsp/index.js';
+import { CUSTOM_DEFAULT_CODE, CUSTOM_EXAMPLES, CUSTOM_HELP } from './dsp/custom.js';
 
 const META = effectMeta();
 const BY_KIND = Object.fromEntries(META.map((m) => [m.kind, m]));
-const GROUP_ORDER = ['Dynamics', 'Distortion', 'Filter & EQ', 'Modulation', 'Delay & reverb', 'Pitch & frequency', 'Stereo & texture', 'Voice'];
+const GROUP_ORDER = ['Dynamics', 'Distortion', 'Filter & EQ', 'Modulation', 'Delay & reverb', 'Pitch & frequency', 'Stereo & texture', 'Voice', 'Code'];
 
 const $ = (id) => document.getElementById(id);
 const uid = () => 'fx' + Math.random().toString(36).slice(2, 9);
@@ -30,14 +31,16 @@ function loadState() {
       return {
         master: Number.isFinite(s.master) ? s.master : 0.8,
         inputGain: Number.isFinite(s.inputGain) ? s.inputGain : 0,
+        auto: s.auto !== false,
         chain: s.chain.filter((c) => BY_KIND[c.kind]).map((c) => ({
           id: c.id || uid(), kind: c.kind, params: { ...defaults(c.kind), ...c.params },
           bypass: !!c.bypass, open: c.open !== false,
+          ...(c.kind === 'custom' ? { code: typeof c.code === 'string' ? c.code : CUSTOM_DEFAULT_CODE } : {}),
         })),
       };
     }
   } catch { /* ignore corrupt or unavailable storage */ }
-  return { master: 0.8, inputGain: 0, chain: [] };
+  return { master: 0.8, inputGain: 0, auto: true, chain: [] };
 }
 
 const state = loadState();
@@ -45,7 +48,7 @@ let saveTimer = 0;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(STORE, JSON.stringify(state, (k, v) => (k === 'verified' ? undefined : v))); } catch { /* storage unavailable */ }
   }, 200);
 }
 
@@ -57,7 +60,12 @@ const post = (m) => { if (node) node.port.postMessage(m); };
 
 function setStatus(t) { $('status').textContent = t; }
 
-const chainPayload = () => state.chain.map((c) => ({ id: c.id, kind: c.kind, params: { ...c.params }, bypass: c.bypass }));
+// Custom code only reaches the audio thread after the pre-check passed (code: false means "not yet").
+const payloadItem = (c) => ({
+  id: c.id, kind: c.kind, params: { ...c.params }, bypass: c.bypass,
+  ...(c.kind === 'custom' ? { code: c.verified === c.code ? c.code : false } : {}),
+});
+const chainPayload = () => state.chain.map(payloadItem);
 
 async function ensureEngine() {
   if (!ctx) {
@@ -71,6 +79,7 @@ async function ensureEngine() {
     post({ type: 'init', chain: chainPayload() });
     post({ type: 'master', value: state.master });
     post({ type: 'input', value: Math.pow(10, state.inputGain / 20) });
+    post({ type: 'auto', value: state.auto });
   }
   if (ctx.state !== 'running') await ctx.resume();
 }
@@ -81,6 +90,11 @@ function latencyText() {
 }
 
 function onNodeMessage(e) {
+  if (e.data.type === 'error') {
+    const el = codeStatus.get(e.data.id);
+    if (el) showCodeStatus(el, e.data.message, e.data.message.startsWith('Warning') ? 'warn' : 'bad');
+    return;
+  }
   if (e.data.type !== 'meter') return;
   const db = 20 * Math.log10(Math.max(e.data.peak, 1e-4));
   const bar = $('meterBar');
@@ -192,7 +206,7 @@ function fromSlider(d, t) {
 function paramRow(item, d) {
   const id = `${item.id}-${d.key}`;
   const out = h('output', { for: id });
-  const label = h('label', { for: id, title: 'Double-tap the name to reset' }, d.label, out);
+  const label = h('label', { for: id }, d.label, out);
   let control;
 
   const commit = (v) => {
@@ -215,10 +229,6 @@ function paramRow(item, d) {
       if (d.int) control.value = Math.round(toSlider(d, v) * 1000);
     });
   }
-  label.addEventListener('dblclick', () => {
-    control.value = d.type === 'select' ? d.def : Math.round(toSlider(d, d.def) * 1000);
-    commit(d.def);
-  });
   out.textContent = fmt(d, item.params[d.key]);
   return h('div', { class: 'param' }, label, control);
 }
@@ -305,24 +315,98 @@ function move(id, dir) {
 }
 
 function removeItem(id) {
+  codeStatus.delete(id);
   state.chain = state.chain.filter((c) => c.id !== id);
   post({ type: 'remove', id });
   save(); renderChain();
 }
 
-function resetItem(item) {
-  item.params = defaults(item.kind);
-  for (const [key, value] of Object.entries(item.params)) post({ type: 'set', id: item.id, key, value });
-  save(); renderChain();
+// ---------------------------------------------------------------- custom code
+const codeStatus = new Map();   // item id -> status element
+function showCodeStatus(el, text, kind) {
+  el.textContent = text;
+  el.className = 'code-status ' + (kind || '');
+}
+
+// Runs the code on a test signal in a Web Worker. A worker that does not
+// answer in time is terminated, so an endless loop can never reach the audio.
+function checkCode(code) {
+  return new Promise((resolve) => {
+    let w;
+    try { w = new Worker('custom-check.js', { type: 'module' }); }
+    catch { resolve({ ok: true, warning: 'Could not pre-check your code on this device.' }); return; }
+    const done = (r) => { clearTimeout(timer); w.terminate(); resolve(r); };
+    const timer = setTimeout(() => done({ ok: false, error: 'Your code did not finish. Check for a loop that never ends.' }), 1500);
+    w.onmessage = (e) => done(e.data);
+    w.onerror = () => done({ ok: true, warning: 'Could not pre-check your code on this device.' });
+    w.postMessage({ code, sr: (ctx && ctx.sampleRate) || 48000 });
+  });
+}
+
+function knobLabels(code) {
+  const out = { 1: 'Knob 1', 2: 'Knob 2', 3: 'Knob 3', 4: 'Knob 4' };
+  for (const m of code.matchAll(/\/\/\s*knob([1-4])\s*:\s*(.+)/g)) out[m[1]] = m[2].trim().slice(0, 40);
+  return out;
+}
+
+function codeEditor(item, rows) {
+  const area = h('textarea', {
+    class: 'code', rows: 14, spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off',
+    'aria-label': 'Custom effect code, JavaScript',
+  });
+  area.value = item.code;
+  const status = h('p', { class: 'code-status', role: 'status' });
+  codeStatus.set(item.id, status);
+  let timer = 0, seq = 0;
+
+  const relabel = () => {
+    const names = knobLabels(area.value);
+    rows.forEach((row, i) => { row.querySelector('label').firstChild.nodeValue = names[i + 1]; });
+  };
+  const run = async () => {
+    const code = area.value;
+    const mine = ++seq;
+    showCodeStatus(status, 'Checking...', '');
+    const r = await checkCode(code);
+    if (mine !== seq) return;
+    if (r.ok) {
+      item.verified = code;
+      post({ type: 'code', id: item.id, code });
+      showCodeStatus(status, r.warning || 'Running', r.warning ? 'warn' : 'ok');
+    } else {
+      item.verified = null;
+      showCodeStatus(status, r.error, 'bad');
+    }
+  };
+  area.addEventListener('input', () => {
+    item.code = area.value; save(); relabel();
+    clearTimeout(timer); timer = setTimeout(run, 700);
+  });
+  const examples = h('select', { 'aria-label': 'Load an example' },
+    h('option', { value: '' }, 'Load an example...'),
+    CUSTOM_EXAMPLES.map((e, i) => h('option', { value: i }, e.name)));
+  examples.addEventListener('change', () => {
+    const ex = CUSTOM_EXAMPLES[examples.value];
+    examples.value = '';
+    if (!ex || (area.value !== ex.code && !confirm('Replace your code with this example?'))) return;
+    area.value = ex.code; item.code = ex.code; save(); relabel(); run();
+  });
+  relabel();
+  run();
+  return h('div', { class: 'code-wrap' },
+    area,
+    h('div', { class: 'row' }, h('button', { class: 'primary', onclick: () => { clearTimeout(timer); run(); } }, 'Run'), examples),
+    status,
+    h('details', { class: 'help' }, h('summary', {}, 'How it works'), h('pre', {}, CUSTOM_HELP)));
 }
 
 function cardFor(item, index) {
   const meta = BY_KIND[item.kind];
-  const body = h('div', { class: 'card-body' },
-    h('p', { class: 'desc' }, meta.desc),
-    meta.params.map((d) => paramRow(item, d)));
+  const rows = meta.params.map((d) => paramRow(item, d));
+  const body = h('div', { class: 'card-body' }, h('p', { class: 'desc' }, meta.desc));
+  if (item.kind === 'custom') body.append(codeEditor(item, rows));
+  body.append(...rows);
   if (item.kind === 'vocoder') body.append(keyboard(item));
-  body.append(h('div', { class: 'card-foot' }, h('button', { onclick: () => resetItem(item) }, 'Reset controls')));
   body.hidden = !item.open;
 
   const card = h('article', { class: 'card' + (item.bypass ? ' bypassed' : '') });
@@ -356,8 +440,9 @@ function renderChain() {
 
 function addEffect(kind) {
   const item = { id: uid(), kind, params: defaults(kind), bypass: false, open: true };
+  if (kind === 'custom') item.code = CUSTOM_DEFAULT_CODE;
   state.chain.push(item);
-  post({ type: 'add', item: { id: item.id, kind, params: { ...item.params }, bypass: false } });
+  post({ type: 'add', item: payloadItem(item) });
   save(); renderChain();
   const last = chainEl.lastElementChild;
   if (last) last.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -394,7 +479,7 @@ $('search').addEventListener('input', (e) => {
 $('btnAdd').addEventListener('click', () => { $('search').value = ''; $('search').dispatchEvent(new Event('input')); picker.showModal(); });
 $('btnClear').addEventListener('click', () => {
   if (!state.chain.length || !confirm('Remove every effect from the chain?')) return;
-  state.chain = []; post({ type: 'init', chain: [] }); save(); renderChain();
+  codeStatus.clear(); state.chain = []; post({ type: 'init', chain: [] }); save(); renderChain();
 });
 $('btnMic').addEventListener('click', useMic);
 $('btnStop').addEventListener('click', stopAll);
@@ -406,6 +491,9 @@ $('file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f
 const inGain = $('inGain'), master = $('master');
 inGain.value = state.inputGain; $('inGainOut').textContent = `${state.inputGain} dB`;
 master.value = state.master; $('masterOut').textContent = `${Math.round(state.master * 100)}%`;
+const autoBox = $('auto');
+autoBox.checked = state.auto;
+autoBox.addEventListener('change', () => { state.auto = autoBox.checked; post({ type: 'auto', value: state.auto }); save(); });
 inGain.addEventListener('input', () => {
   state.inputGain = Number(inGain.value);
   $('inGainOut').textContent = `${state.inputGain} dB`;

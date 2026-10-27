@@ -2,7 +2,7 @@ import { FX, register, Biquad, SVF, clamp, dbToLin, coef } from './core.js';
 
 const MAX_STAGES = 4;
 
-function makeFilter(kind, label, mode, desc, defFreq, defQ) {
+function makeFilter(kind, label, mode, desc, defFreq, defQ, defStages, defGain) {
   class Filter extends FX {
     static label = label;
     static group = 'Filter & EQ';
@@ -10,7 +10,8 @@ function makeFilter(kind, label, mode, desc, defFreq, defQ) {
     static params = [
       { key: 'freq', label: 'Frequency', min: 20, max: 20000, step: 1, def: defFreq, unit: ' Hz', log: true },
       { key: 'q', label: 'Resonance (Q)', min: 0.1, max: 20, step: 0.01, def: defQ, log: true },
-      { key: 'stages', label: 'Steepness (stages)', min: 1, max: MAX_STAGES, step: 1, def: 1, int: true },
+      { key: 'stages', label: 'Steepness (stages)', min: 1, max: MAX_STAGES, step: 1, def: defStages, int: true },
+      { key: 'gain', label: 'Output level', min: -12, max: 24, step: 0.5, def: defGain, unit: ' dB' },
       { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
     ];
     init() {
@@ -36,36 +37,37 @@ function makeFilter(kind, label, mode, desc, defFreq, defQ) {
       this.sq += (Math.log(this.p.q) - this.sq) * 0.3;
       this.apply();
       const st = Math.round(this.p.stages), mix = this.p.mix;
+      const og = dbToLin(this.p.gain);
       const bl = this.bl, br = this.br;
       for (let s = st; s < MAX_STAGES; s++) { bl[s].reset(); br[s].reset(); }
       for (let i = 0; i < n; i++) {
         let x = L[i], y = R[i];
         for (let s = 0; s < st; s++) { x = bl[s].run(x); y = br[s].run(y); }
-        L[i] = L[i] * (1 - mix) + x * mix;
-        R[i] = R[i] * (1 - mix) + y * mix;
+        L[i] = L[i] * (1 - mix) + x * og * mix;
+        R[i] = R[i] * (1 - mix) + y * og * mix;
       }
     }
   }
   register(kind, Filter);
 }
 
-makeFilter('lowpass', 'Low-pass filter', 'lp', 'Removes highs above the cutoff.', 4000, 0.707);
-makeFilter('highpass', 'High-pass filter', 'hp', 'Removes lows below the cutoff.', 200, 0.707);
-makeFilter('bandpass', 'Band-pass filter', 'bp', 'Keeps only a band around the frequency.', 1000, 2);
-makeFilter('notch', 'Notch filter', 'notch', 'Cuts a narrow band around the frequency.', 1000, 4);
+makeFilter('lowpass', 'Low-pass filter', 'lp', 'Removes highs above the cutoff.', 900, 2, 2, 0);
+makeFilter('highpass', 'High-pass filter', 'hp', 'Removes lows below the cutoff.', 900, 1.2, 2, 0);
+makeFilter('bandpass', 'Band-pass filter', 'bp', 'Keeps only a band around the frequency.', 1400, 1.5, 2, 9);
+makeFilter('notch', 'Notch filter', 'notch', 'Cuts a band around the frequency. Lower Q makes a wider scoop.', 1200, 0.7, 2, 0);
 
 class EQ3 extends FX {
   static label = 'Equalizer';
   static group = 'Filter & EQ';
   static desc = 'Low shelf, one parametric mid band and a high shelf.';
   static params = [
-    { key: 'lowFreq', label: 'Low shelf frequency', min: 40, max: 800, step: 1, def: 120, unit: ' Hz', log: true },
-    { key: 'lowGain', label: 'Low gain', min: -18, max: 18, step: 0.1, def: 0, unit: ' dB' },
-    { key: 'midFreq', label: 'Mid frequency', min: 200, max: 6000, step: 1, def: 1000, unit: ' Hz', log: true },
-    { key: 'midGain', label: 'Mid gain', min: -18, max: 18, step: 0.1, def: 0, unit: ' dB' },
-    { key: 'midQ', label: 'Mid width (Q)', min: 0.2, max: 8, step: 0.01, def: 1, log: true },
-    { key: 'highFreq', label: 'High shelf frequency', min: 1500, max: 16000, step: 10, def: 6000, unit: ' Hz', log: true },
-    { key: 'highGain', label: 'High gain', min: -18, max: 18, step: 0.1, def: 0, unit: ' dB' },
+    { key: 'lowFreq', label: 'Low shelf frequency', min: 40, max: 800, step: 1, def: 200, unit: ' Hz', log: true },
+    { key: 'lowGain', label: 'Low gain', min: -18, max: 18, step: 0.1, def: -10, unit: ' dB' },
+    { key: 'midFreq', label: 'Mid frequency', min: 200, max: 6000, step: 1, def: 1800, unit: ' Hz', log: true },
+    { key: 'midGain', label: 'Mid gain', min: -18, max: 18, step: 0.1, def: 10, unit: ' dB' },
+    { key: 'midQ', label: 'Mid width (Q)', min: 0.2, max: 8, step: 0.01, def: 1.2, log: true },
+    { key: 'highFreq', label: 'High shelf frequency', min: 1500, max: 16000, step: 10, def: 5000, unit: ' Hz', log: true },
+    { key: 'highGain', label: 'High gain', min: -18, max: 18, step: 0.1, def: 8, unit: ' dB' },
   ];
   init() {
     this.l = [new Biquad(), new Biquad(), new Biquad()];
@@ -145,10 +147,10 @@ class FilterSweep extends FX {
   static desc = 'A resonant filter swept up and down automatically.';
   static params = [
     { key: 'mode', label: 'Filter type', type: 'select', options: ['Low-pass', 'Band-pass', 'High-pass'], def: 0 },
-    { key: 'rate', label: 'Rate', min: 0.05, max: 10, step: 0.01, def: 0.5, unit: ' Hz', log: true },
+    { key: 'rate', label: 'Rate', min: 0.05, max: 10, step: 0.01, def: 0.35, unit: ' Hz', log: true },
     { key: 'min', label: 'Lowest frequency', min: 80, max: 4000, step: 1, def: 200, unit: ' Hz', log: true },
     { key: 'max', label: 'Highest frequency', min: 200, max: 12000, step: 1, def: 4000, unit: ' Hz', log: true },
-    { key: 'q', label: 'Resonance (Q)', min: 0.5, max: 15, step: 0.1, def: 3, log: true },
+    { key: 'q', label: 'Resonance (Q)', min: 0.5, max: 15, step: 0.1, def: 5, log: true },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
   ];
   init() { this.bl = new SVF('lp'); this.br = new SVF('lp'); this.ph = 0; this.cnt = 0; this.update(); }

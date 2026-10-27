@@ -99,7 +99,6 @@ select, input[type="search"] {
 .desc { margin: 0 0 6px; font-size: 13px; color: var(--dim); }
 .param { margin-top: 2px; }
 .param label { cursor: default; user-select: none; }
-.card-foot { margin-top: 8px; display: flex; gap: 8px; }
 
 /* On-screen keyboard (vocoder carrier notes) */
 .kbd-wrap { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
@@ -135,3 +134,15 @@ dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .pick small { color: var(--dim); font-size: 12px; }
 
 @media (prefers-reduced-motion: reduce) { #meterBar { transition: none; } }
+
+.ctl.check label { justify-content: flex-start; align-items: center; gap: 8px; color: var(--text); }
+.code-wrap { margin: 8px 0 12px; display: grid; gap: 8px; }
+textarea.code { width: 100%; box-sizing: border-box; min-height: 240px; resize: vertical; tab-size: 2;
+  font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text);
+  background: #0a0c10; border: 1px solid #2a2f3a; border-radius: 8px; padding: 10px; white-space: pre; overflow: auto; }
+.code-status { margin: 0; font-size: 13px; min-height: 1.3em; color: var(--dim); }
+.code-status.ok { color: #6fd08c; }
+.code-status.warn { color: #e8c15a; }
+.code-status.bad { color: #ff7b72; }
+.help pre { white-space: pre-wrap; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--dim); margin: 8px 0 0; }
+.help summary { cursor: pointer; color: var(--dim); font-size: 14px; }

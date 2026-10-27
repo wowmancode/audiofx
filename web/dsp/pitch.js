@@ -29,7 +29,7 @@ class PitchShifter extends FX {
   static group = 'Pitch & frequency';
   static desc = 'Shifts pitch up or down without changing speed.';
   static params = [
-    { key: 'semi', label: 'Shift', min: -24, max: 24, step: 0.01, def: 4, unit: ' semitones' },
+    { key: 'semi', label: 'Shift', min: -24, max: 24, step: 0.01, def: 7, unit: ' semitones' },
     { key: 'grain', label: 'Window size', min: 20, max: 200, step: 1, def: 60, unit: ' ms' },
     { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 1 },
   ];
@@ -127,8 +127,8 @@ class FreqShifter extends FX {
   static group = 'Pitch & frequency';
   static desc = 'Shifts all frequencies by a fixed number of Hz for bell-like, inharmonic tones.';
   static params = [
-    { key: 'shift', label: 'Shift', min: -1000, max: 1000, step: 0.5, def: 50, unit: ' Hz' },
-    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.7 },
+    { key: 'shift', label: 'Shift', min: -1000, max: 1000, step: 0.5, def: 120, unit: ' Hz' },
+    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.85 },
   ];
   init() {
     this.bl = new Float32Array(HN * 2); this.br = new Float32Array(HN * 2);

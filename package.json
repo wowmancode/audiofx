@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Real-time browser audio effects, deployed with GitHub Actions.",
   "scripts": {
-    "test": "node test/test.mjs && node test/worklet.test.mjs",
+    "test": "node test/test.mjs && node test/worklet.test.mjs && node test/distinct.test.mjs && node test/custom.test.mjs",
     "start": "npx --yes serve web"
   },
   "engines": {

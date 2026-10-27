@@ -26,10 +26,15 @@ The app works fully offline and asks only for the microphone permission. Use wir
 | Modulation | Tremolo, Chorus, Flanger, Phaser, Vibrato, Tape wobble |
 | Delay & reverb | Delay, Ping-pong delay, Reverb, Comb resonator, Stutter |
 | Pitch & frequency | Pitch shifter, Harmonizer, Reverse, Frequency shifter, Ring modulator |
-| Stereo & texture | Stereo width, Auto-pan, Pan, Noise & crackle |
+| Stereo & texture | Stereo widener, Auto-pan, Noise & crackle |
+| Code | Custom code: write your own effect in JavaScript |
 | Voice | Vocoder |
 
-Order matters: effects run top to bottom, and you can reorder, bypass, collapse and reset each one. Double-tap a control's name to reset it.
+Order matters: effects run top to bottom, and you can reorder, bypass and collapse each one.
+
+**Auto level** (on by default) rides the input to a steady level so a quiet phone microphone and a loud file make every effect react the same way. Turn it off in the Input panel for full manual control.
+
+**Custom code** runs your JavaScript for every audio sample, with four sliders (name them with `// knob1: Label` comments), delay, filter, envelope and oscillator helpers, and a list of examples. The app tests your code in a background worker first, so an error or an endless loop is reported and never reaches the audio.
 
 ### The vocoder
 

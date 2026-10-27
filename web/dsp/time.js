@@ -5,10 +5,10 @@ class Delay extends FX {
   static group = 'Delay & reverb';
   static desc = 'Echo with feedback and a tone control on the repeats.';
   static params = [
-    { key: 'time', label: 'Time', min: 1, max: 2000, step: 1, def: 350, unit: ' ms' },
-    { key: 'feedback', label: 'Feedback', min: 0, max: 0.95, step: 0.01, def: 0.4 },
-    { key: 'tone', label: 'Repeat tone (low-pass)', min: 500, max: 16000, step: 10, def: 6000, unit: ' Hz', log: true },
-    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.35 },
+    { key: 'time', label: 'Time', min: 1, max: 2000, step: 1, def: 420, unit: ' ms' },
+    { key: 'feedback', label: 'Feedback', min: 0, max: 0.95, step: 0.01, def: 0.5 },
+    { key: 'tone', label: 'Repeat tone (low-pass)', min: 500, max: 16000, step: 10, def: 3500, unit: ' Hz', log: true },
+    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.5 },
   ];
   init() {
     this.dl = new DelayLine(this.sr * 2.05); this.dr = new DelayLine(this.sr * 2.05);
@@ -41,10 +41,10 @@ class PingPong extends FX {
   static group = 'Delay & reverb';
   static desc = 'Echoes that bounce between the left and right channels.';
   static params = [
-    { key: 'time', label: 'Time', min: 20, max: 1500, step: 1, def: 300, unit: ' ms' },
-    { key: 'feedback', label: 'Feedback', min: 0, max: 0.92, step: 0.01, def: 0.5 },
-    { key: 'tone', label: 'Repeat tone (low-pass)', min: 500, max: 16000, step: 10, def: 7000, unit: ' Hz', log: true },
-    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.4 },
+    { key: 'time', label: 'Time', min: 20, max: 1500, step: 1, def: 240, unit: ' ms' },
+    { key: 'feedback', label: 'Feedback', min: 0, max: 0.92, step: 0.01, def: 0.6 },
+    { key: 'tone', label: 'Repeat tone (low-pass)', min: 500, max: 16000, step: 10, def: 6000, unit: ' Hz', log: true },
+    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.55 },
   ];
   init() {
     this.dl = new DelayLine(this.sr * 1.6); this.dr = new DelayLine(this.sr * 1.6);
@@ -84,11 +84,11 @@ class Reverb extends FX {
   static group = 'Delay & reverb';
   static desc = 'Room ambience built from parallel combs and all-pass diffusers.';
   static params = [
-    { key: 'size', label: 'Room size', min: 0, max: 1, step: 0.01, def: 0.6 },
-    { key: 'damp', label: 'Damping', min: 0, max: 1, step: 0.01, def: 0.4 },
-    { key: 'predelay', label: 'Pre-delay', min: 0, max: 150, step: 1, def: 12, unit: ' ms' },
+    { key: 'size', label: 'Room size', min: 0, max: 1, step: 0.01, def: 0.85 },
+    { key: 'damp', label: 'Damping', min: 0, max: 1, step: 0.01, def: 0.3 },
+    { key: 'predelay', label: 'Pre-delay', min: 0, max: 150, step: 1, def: 25, unit: ' ms' },
     { key: 'width', label: 'Stereo width', min: 0, max: 1, step: 0.01, def: 1 },
-    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.3 },
+    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.45 },
   ];
   init() {
     const s = this.sr / 44100;
@@ -158,10 +158,10 @@ class CombFilter extends FX {
   static group = 'Delay & reverb';
   static desc = 'A very short feedback delay that rings at a pitch you choose.';
   static params = [
-    { key: 'freq', label: 'Resonant pitch', min: 40, max: 2000, step: 0.5, def: 220, unit: ' Hz', log: true },
-    { key: 'feedback', label: 'Feedback', min: -0.98, max: 0.98, step: 0.01, def: 0.7 },
-    { key: 'damp', label: 'Damping', min: 0, max: 0.95, step: 0.01, def: 0.2 },
-    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.5 },
+    { key: 'freq', label: 'Resonant pitch', min: 40, max: 2000, step: 0.5, def: 180, unit: ' Hz', log: true },
+    { key: 'feedback', label: 'Feedback', min: -0.98, max: 0.98, step: 0.01, def: 0.85 },
+    { key: 'damp', label: 'Damping', min: 0, max: 0.95, step: 0.01, def: 0.3 },
+    { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.01, def: 0.7 },
   ];
   init() {
     this.dl = new DelayLine(this.sr / 30 + 8); this.dr = new DelayLine(this.sr / 30 + 8);

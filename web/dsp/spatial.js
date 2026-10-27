@@ -1,32 +1,38 @@
-import { FX, register, Biquad, clamp, dbToLin, TAU } from './core.js';
+import { FX, register, Biquad, DelayLine, clamp, dbToLin, TAU } from './core.js';
 
-class StereoWidth extends FX {
-  static label = 'Stereo width';
+class StereoWidener extends FX {
+  static label = 'Stereo widener';
   static group = 'Stereo & texture';
-  static desc = 'Narrows toward mono or widens using mid/side processing.';
+  static desc = 'Spreads the sound across your headphones. It also works on a mono microphone by adding decorrelated copies to each side.';
   static params = [
-    { key: 'width', label: 'Width', min: 0, max: 2, step: 0.01, def: 1.4 },
-    { key: 'mid', label: 'Center level', min: -12, max: 12, step: 0.1, def: 0, unit: ' dB' },
+    { key: 'amount', label: 'Spread from mono', min: 0, max: 1, step: 0.01, def: 0.8 },
+    { key: 'delay', label: 'Spread delay', min: 5, max: 40, step: 0.5, def: 14, unit: ' ms' },
+    { key: 'width', label: 'Side width (stereo sources)', min: 0, max: 2, step: 0.01, def: 1.5 },
   ];
-  update() { this.mg = dbToLin(this.p.mid); }
+  init() { this.dl = new DelayLine(this.sr * 0.09); this.update(); }
   process(L, R, n) {
-    const w = this.p.width, mg = this.mg;
+    const { amount, width } = this.p;
+    const d1 = this.p.delay * 0.001 * this.sr, d2 = d1 * 1.7;
+    const comp = 1 / (1 + 0.4 * amount);
     for (let i = 0; i < n; i++) {
-      const m = (L[i] + R[i]) * 0.5 * mg, s = (L[i] - R[i]) * 0.5 * w;
-      L[i] = m + s; R[i] = m - s;
+      const mid = (L[i] + R[i]) * 0.5, side = (L[i] - R[i]) * 0.5 * width;
+      this.dl.push(mid);
+      const a = this.dl.tap(d1), b = this.dl.tap(d2);
+      L[i] = (mid + side + amount * a) * comp;
+      R[i] = (mid - side - amount * b) * comp;
     }
   }
 }
-register('width', StereoWidth);
+register('width', StereoWidener);
 
 class Autopan extends FX {
   static label = 'Auto-pan';
   static group = 'Stereo & texture';
   static desc = 'Sweeps the sound between left and right.';
   static params = [
-    { key: 'rate', label: 'Rate', min: 0.05, max: 10, step: 0.01, def: 1, unit: ' Hz', log: true },
-    { key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01, def: 0.8 },
-    { key: 'shape', label: 'Shape (smooth to square)', min: 0, max: 1, step: 0.01, def: 0 },
+    { key: 'rate', label: 'Rate', min: 0.05, max: 10, step: 0.01, def: 0.7, unit: ' Hz', log: true },
+    { key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01, def: 1 },
+    { key: 'shape', label: 'Shape (smooth to square)', min: 0, max: 1, step: 0.01, def: 0.2 },
   ];
   init() { this.ph = 0; this.update(); }
   process(L, R, n) {
@@ -45,39 +51,15 @@ class Autopan extends FX {
   }
 }
 register('autopan', Autopan);
-
-class Pan extends FX {
-  static label = 'Pan';
-  static group = 'Stereo & texture';
-  static desc = 'Fixed left/right position with constant-power balance.';
-  static params = [
-    { key: 'pan', label: 'Position', min: -1, max: 1, step: 0.01, def: 0 },
-  ];
-  init() { this.cur = this.p.pan; this.update(); }
-  process(L, R, n) {
-    const target = this.p.pan;
-    let c = this.cur;
-    const step = (target - c) / n;
-    for (let i = 0; i < n; i++) {
-      c += step;
-      const a = (c + 1) * Math.PI * 0.25;
-      L[i] *= Math.cos(a) * Math.SQRT2;
-      R[i] *= Math.sin(a) * Math.SQRT2;
-    }
-    this.cur = target;
-  }
-}
-register('pan', Pan);
-
 class NoiseLayer extends FX {
   static label = 'Noise & crackle';
   static group = 'Stereo & texture';
   static desc = 'Adds a bed of hiss, optionally colored, plus random clicks.';
   static params = [
-    { key: 'level', label: 'Hiss level', min: -80, max: 0, step: 0.5, def: -42, unit: ' dB' },
-    { key: 'color', label: 'Hiss low-pass', min: 200, max: 20000, step: 10, def: 20000, unit: ' Hz', log: true },
-    { key: 'crackle', label: 'Crackle density', min: 0, max: 60, step: 0.5, def: 0, unit: ' /s' },
-    { key: 'clickLevel', label: 'Crackle level', min: -50, max: 0, step: 0.5, def: -24, unit: ' dB' },
+    { key: 'level', label: 'Hiss level', min: -80, max: 0, step: 0.5, def: -30, unit: ' dB' },
+    { key: 'color', label: 'Hiss low-pass', min: 200, max: 20000, step: 10, def: 12000, unit: ' Hz', log: true },
+    { key: 'crackle', label: 'Crackle density', min: 0, max: 60, step: 0.5, def: 8, unit: ' /s' },
+    { key: 'clickLevel', label: 'Crackle level', min: -50, max: 0, step: 0.5, def: -20, unit: ' dB' },
   ];
   init() { this.lpL = new Biquad(); this.lpR = new Biquad(); this.update(); }
   update() {

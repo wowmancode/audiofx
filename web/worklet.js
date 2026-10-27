@@ -7,6 +7,17 @@ class FxChain extends AudioWorkletProcessor {
     this.chain = [];          // [{ id, kind, params, bypass, fx }]
     this.master = 0.8;
     this.input = 1;
+    // Auto level: a slow gain rider that holds the input near -20 dBFS RMS so
+    // compressors, gates and distortions respond the same for a quiet phone
+    // mic as for a loud file. It holds still when the input is near silent,
+    // so room noise is not pumped up.
+    this.auto = true;
+    this.agcGain = 1;
+    this.agcPow = 0;
+    this.agcAtk = 1 - Math.exp(-1 / (0.03 * sampleRate));
+    this.agcRel = 1 - Math.exp(-1 / (0.4 * sampleRate));
+    this.agcDown = 1 - Math.exp(-1 / (0.02 * sampleRate));
+    this.agcUp = 1 - Math.exp(-1 / (0.5 * sampleRate));
     this.L = new Float32Array(128);
     this.R = new Float32Array(128);
     this.blocks = 0;
@@ -17,6 +28,13 @@ class FxChain extends AudioWorkletProcessor {
 
   build(item) {
     item.fx = createEffect(item.kind, sampleRate, item.params);
+    if (item.kind === 'custom') {
+      item.fx.onError = (message) => this.port.postMessage({ type: 'error', id: item.id, message });
+      // code === false means the app could not verify the code, so the
+      // effect stays out of the way until it is fixed.
+      if (item.code === false) item.fx.disable();
+      else if (typeof item.code === 'string') item.fx.setCode(item.code);
+    }
     return item;
   }
 
@@ -46,6 +64,11 @@ class FxChain extends AudioWorkletProcessor {
         if (c) c.bypass = m.value;
         break;
       }
+      case 'code': {
+        const c = this.chain.find((x) => x.id === m.id);
+        if (c && c.fx.setCode) { c.code = m.code; c.fx.setCode(m.code); }
+        break;
+      }
       case 'notes': {
         const c = this.chain.find((x) => x.id === m.id);
         if (c && c.fx.setNotes) c.fx.setNotes(m.notes);
@@ -53,6 +76,7 @@ class FxChain extends AudioWorkletProcessor {
       }
       case 'master': this.master = m.value; break;
       case 'input': this.input = m.value; break;
+      case 'auto': this.auto = !!m.value; break;
     }
   }
 
@@ -69,6 +93,22 @@ class FxChain extends AudioWorkletProcessor {
       for (let i = 0; i < n; i++) { L[i] = a[i] * g; R[i] = b[i] * g; }
     } else {
       L.fill(0); R.fill(0);
+    }
+
+    if (this.auto) {
+      let gain = this.agcGain, pw = this.agcPow;
+      for (let i = 0; i < n; i++) {
+        const p = (L[i] * L[i] + R[i] * R[i]) * 0.5;
+        pw += (p > pw ? this.agcAtk : this.agcRel) * (p - pw);
+        const rms = Math.sqrt(pw);
+        if (rms > 0.004) {
+          let want = 0.1 / rms;
+          if (want > 32) want = 32; else if (want < 0.05) want = 0.05;
+          gain += (want - gain) * (want < gain ? this.agcDown : this.agcUp);
+        }
+        L[i] *= gain; R[i] *= gain;
+      }
+      this.agcGain = gain; this.agcPow = pw;
     }
 
     for (const c of this.chain) {

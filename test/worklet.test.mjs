@@ -31,6 +31,7 @@ const rms = (a) => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length);
 
 // Empty chain passes audio through scaled by the master volume.
 send({ type: 'master', value: 1 });
+send({ type: 'auto', value: false });
 let o = block();
 check(Math.abs(rms(o[0]) / lastIn - 1) < 0.01, 'empty chain passes input through');
 check(rms(block(false)[0]) === 0, 'no input gives silence');
@@ -66,6 +67,43 @@ send({ type: 'set', id: 'a', key: 'gain', value: NaN });
 send({ type: 'set', id: 'zzz', key: 'gain', value: 1 });
 o = block();
 check(o[0].every(Number.isFinite), 'NaN parameter and unknown id are ignored');
+
+// Auto level: a quiet input is brought up to about -20 dBFS RMS, a loud one
+// is brought down, near-silence is left alone, and turning it off is exact.
+{
+  const q = new Registered.cls();
+  const go = (m) => q.port.onmessage({ data: m });
+  go({ type: 'master', value: 1 });
+  go({ type: 'init', chain: [] });
+  const run = (amp, seconds) => {
+    let sum = 0, cnt = 0, tt = 0;
+    for (let b = 0; b < (seconds * 48000) / 128; b++) {
+      const inp = [[Float32Array.from({ length: 128 }, (_, i) => amp * Math.sin((2 * Math.PI * 220 * (tt + i)) / 48000))]];
+      tt += 128;
+      const out = [[new Float32Array(128), new Float32Array(128)]];
+      q.process(inp, out);
+      if (b > (seconds * 48000) / 128 - 100) for (const v of out[0][0]) { sum += v * v; cnt++; }
+    }
+    return Math.sqrt(sum / cnt);
+  };
+  const quiet = run(0.028, 6);            // about -34 dBFS RMS
+  check(quiet > 0.07 && quiet < 0.14, `auto level lifts a quiet input to about 0.1 RMS (got ${quiet.toFixed(3)})`);
+  const loud = run(0.9, 6);               // about -4 dBFS RMS
+  check(loud > 0.07 && loud < 0.14, `auto level lowers a loud input to about 0.1 RMS (got ${loud.toFixed(3)})`);
+  const hush = new Registered.cls();
+  hush.port.onmessage({ data: { type: 'master', value: 1 } });
+  let hs = 0, hc = 0;
+  for (let b = 0; b < 400; b++) {
+    const inp = [[Float32Array.from({ length: 128 }, () => 0.0006 * (Math.random() * 2 - 1))]];
+    const out = [[new Float32Array(128), new Float32Array(128)]];
+    hush.process(inp, out);
+    for (const v of out[0][0]) { hs += v * v; hc++; }
+  }
+  check(Math.sqrt(hs / hc) < 0.002, 'auto level does not pump up near-silent noise');
+  go({ type: 'auto', value: false });
+  const off = run(0.028, 1);
+  check(Math.abs(off / (0.028 / Math.SQRT2) - 1) < 0.05, 'auto level off passes the input through unchanged');
+}
 
 // Meter messages are posted periodically.
 check(p.port.posted.some((m) => m.type === 'meter'), 'meter messages are sent');
